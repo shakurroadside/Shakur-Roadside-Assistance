@@ -1,5 +1,7 @@
 const { createServer } = require("http");
 const { parse } = require("url");
+const fs = require("fs");
+const path = require("path");
 const next = require("next");
 const { WebSocketServer } = require("ws");
 
@@ -7,9 +9,44 @@ const dev = process.env.NODE_ENV !== "production";
 const app = next({ dev });
 const handle = app.getRequestHandler();
 
-// In-memory store (replace with a DB for production)
+// In-memory store, persisted to a JSON file so conversations survive restarts.
+// For a higher-traffic deployment, swap this out for a real database.
+const DATA_DIR = path.join(__dirname, ".data");
+const DATA_FILE = path.join(DATA_DIR, "conversations.json");
+
 const conversations = new Map(); // conversationId -> { id, customer, messages[], status }
 const clients = new Set(); // all connected WebSocket clients
+
+function loadStore() {
+  try {
+    const list = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
+    for (const conv of list) conversations.set(conv.id, conv);
+    console.log(`> Loaded ${conversations.size} conversation(s) from disk`);
+  } catch (err) {
+    if (err.code !== "ENOENT") {
+      console.error("> Failed to load store:", err.message);
+    }
+  }
+}
+
+let saveTimer = null;
+function saveStore() {
+  // Debounce so a burst of messages collapses into a single disk write.
+  if (saveTimer) return;
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    try {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+      const tmp = `${DATA_FILE}.tmp`;
+      fs.writeFileSync(tmp, JSON.stringify(Array.from(conversations.values())));
+      fs.renameSync(tmp, DATA_FILE); // atomic replace, avoids partial writes
+    } catch (err) {
+      console.error("> Failed to persist store:", err.message);
+    }
+  }, 200);
+}
+
+loadStore();
 
 function broadcast(data) {
   const msg = JSON.stringify(data);
@@ -57,6 +94,7 @@ app.prepare().then(() => {
             messages: [],
           };
           conversations.set(conv.id, conv);
+          saveStore();
           broadcast({ type: "CONVERSATION_ADDED", conversation: conv });
           break;
         }
@@ -73,6 +111,7 @@ app.prepare().then(() => {
             timestamp: new Date().toISOString(),
           };
           conv.messages.push(message);
+          saveStore();
           broadcast({ type: "MESSAGE_ADDED", message });
           break;
         }
@@ -81,6 +120,7 @@ app.prepare().then(() => {
           const conv = conversations.get(msg.conversationId);
           if (!conv) return;
           conv.status = msg.status;
+          saveStore();
           broadcast({
             type: "STATUS_UPDATED",
             conversationId: msg.conversationId,

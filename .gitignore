@@ -11,6 +11,9 @@ out/
 build/
 dist/
 
+# Persisted runtime data
+.data/
+
 # Env
 .env
 .env.local

@@ -76,6 +76,14 @@ export default function SettingsPanel({ state, onSaved }: { state: AdminState; o
               <Num label="Minutes" value={String(services[k].minutes)} onChange={(v) => setServices({ ...services, [k]: { ...services[k], minutes: +v } })} />
             </div>
           ))}
+          <div className="grid grid-cols-[1fr_80px_80px] gap-2 items-end">
+            <p className="text-xs text-gray-600 pb-2">Swap extra when tires aren&apos;t on rims (mount &amp; balance)</p>
+            <Num
+              label="Extra $"
+              value={String(services.seasonal_swap.mountFee ?? 0)}
+              onChange={(v) => setServices({ ...services, seasonal_swap: { ...services.seasonal_swap, mountFee: +v } })}
+            />
+          </div>
         </div>
       </Section>
 

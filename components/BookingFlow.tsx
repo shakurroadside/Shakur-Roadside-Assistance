@@ -20,7 +20,7 @@ import {
 
 interface Props {
   admin?: boolean;
-  services: Record<string, { label: string; fee: number }>;
+  services: Record<string, { label: string; fee: number; mountFee?: number }>;
   brands?: string[]; // brands currently in stock, for the picker
   onBooked?: (job: Job) => void;
 }
@@ -40,6 +40,7 @@ export default function BookingFlow({ admin = false, services, brands = [], onBo
   const [size, setSize] = useState("");
   const [qty, setQty] = useState(4);
   const [season, setSeason] = useState<Season>("any");
+  const [onRims, setOnRims] = useState<boolean | null>(null); // seasonal swap only
   const [brand, setBrand] = useState("");
   const [brandText, setBrandText] = useState("");
   const [sourceBrand, setSourceBrand] = useState(false); // customer wants a brand nobody has in stock
@@ -63,16 +64,19 @@ export default function BookingFlow({ admin = false, services, brands = [], onBo
   const [booked, setBooked] = useState<Job | null>(null);
 
   const needsTires = service === "new_tires";
+  const isSwap = service === "seasonal_swap";
+  const swapFee = (rims: boolean) => (services.seasonal_swap?.fee ?? 0) + (rims ? 0 : services.seasonal_swap?.mountFee ?? 0);
 
   const search = async (brandOverride?: string) => {
     const wantBrand = brandOverride ?? brand;
     setError("");
     if (!location) return setError("Please share your location or pick an address.");
     if (needsTires && !size.trim()) return setError("Enter your tire size (on the tire sidewall, e.g. 225/65R17).");
+    if (isSwap && onRims === null) return setError("Let me know if your tires are already on rims.");
     setBusy(true);
     try {
       const r = await api<SearchResult>(admin ? "/api/admin/search" : "/api/public/search", {
-        body: { service, size, qty, season, location, brand: wantBrand },
+        body: { service, size, qty, season, location, brand: wantBrand, onRims: isSwap ? onRims : undefined },
         admin,
       });
       setResult(r);
@@ -118,6 +122,7 @@ export default function BookingFlow({ admin = false, services, brands = [], onBo
           qty,
           inventoryId: needsTires ? option?.inventoryId : undefined,
           location,
+          onRims: isSwap ? onRims : undefined,
           date: pick.date,
           slot: pick.slot,
           customer: { name, phone, email },
@@ -155,7 +160,8 @@ export default function BookingFlow({ admin = false, services, brands = [], onBo
     setError("");
   };
 
-  const serviceFee = services[service]?.fee ?? 0;
+  const serviceFee = result?.serviceFee ?? (isSwap && onRims !== null ? swapFee(onRims) : services[service]?.fee ?? 0);
+  const serviceLabel = isSwap && onRims === false ? `${services[service]?.label} · mount & balance` : isSwap && onRims ? `${services[service]?.label} · on rims` : services[service]?.label;
   const total = needsTires && option ? option.total : serviceFee;
   const firstSnow = result?.advice.firstSnowDate;
 
@@ -245,7 +251,35 @@ export default function BookingFlow({ admin = false, services, brands = [], onBo
             </Card>
           )}
 
-          <Card title={`${needsTires ? "3" : "2"}. Where's your car?`}>
+          {isSwap && (
+            <Card title="2. Are your tires already on rims?">
+              <div className="grid gap-2 sm:grid-cols-2">
+                {[
+                  { rims: true, title: "Yes — they're on rims", hint: "I take your wheels off and put the other set on." },
+                  { rims: false, title: "No — tires only", hint: "I mount and balance your tires onto your rims, right at your car." },
+                ].map((o) => (
+                  <button
+                    key={String(o.rims)}
+                    type="button"
+                    onClick={() => {
+                      setOnRims(o.rims);
+                      setError("");
+                    }}
+                    className={`text-left rounded-xl border-2 p-3 transition ${
+                      onRims === o.rims ? "border-brand-600 bg-brand-50" : "border-gray-200 hover:border-brand-300"
+                    }`}
+                  >
+                    <div className="font-semibold text-sm text-gray-900">{o.title}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{o.hint}</div>
+                    <div className="text-sm font-bold text-brand-700 mt-1">{money(swapFee(o.rims))}</div>
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 mt-2">Not sure? If your other tires have metal wheels inside them, they&apos;re on rims.</p>
+            </Card>
+          )}
+
+          <Card title={`${needsTires || isSwap ? "3" : "2"}. Where's your car?`}>
             <LocationPicker value={location} onChange={setLocation} allowGps={!admin} />
           </Card>
 
@@ -453,7 +487,7 @@ export default function BookingFlow({ admin = false, services, brands = [], onBo
           </button>
           <Card title="Your booking">
             <dl className="text-sm space-y-1">
-              <Row k="Service" v={services[service]?.label} />
+              <Row k="Service" v={serviceLabel} />
               {needsTires && option && <Row k="Tires" v={`${qty}× ${option.brand} ${option.model} ${option.size}`} />}
               {needsTires && !option && (
                 <Row k="Tires" v={`${qty}× ${brand ? `${brand} ` : ""}${result?.size} — I'll source & quote`} />

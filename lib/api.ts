@@ -117,6 +117,7 @@ export interface Job {
   tire: { size: string; brand: string; model: string; season: string; qty: number; unitPrice: number; unitCost: number } | null;
   supplierId: string | null;
   tiresPickedUp: boolean;
+  onRims?: boolean | null; // seasonal swap: false = mount & balance needed
   total: number;
 }
 
@@ -126,7 +127,7 @@ export interface Settings {
   timezone: string;
   base: GeoPoint;
   markupPercent: number;
-  services: Record<ServiceKey, { label: string; fee: number; minutes: number }>;
+  services: Record<ServiceKey, { label: string; fee: number; minutes: number; mountFee?: number }>;
   workDays: number[];
   slots: string[];
   maxJobsPerSlot: number;

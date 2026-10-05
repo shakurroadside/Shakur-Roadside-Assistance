@@ -35,6 +35,7 @@ Common header names such as "Tire Size", "Price", "Stock" and "On Hand" are reco
 ## How suggestions work
 
 - **Days:** for each open slot, the app calculates how much extra driving the job adds between your previous and next stops that day (starting and ending at your base). Days when you're already nearby rank first.
+- **Seasonal swap:** the customer says whether their tires are already on rims. If not, the "mount & balance" extra (Settings) is added and the job card reminds you to bring the tire machine.
 - **Tires:** the customer pays supplier cost + markup % + service fee. The ranking weighs price against the extra km to the supplier (Settings → Driving cost $/km). Customers never see supplier names or costs.
 - **Supplier pickup:** at booking, the job is assigned to whichever supplier with that tire is most on the way, as long as it isn't more expensive than the price the customer was quoted. The stock is reserved and released again if the job is cancelled.
 - **Weather:** the Open-Meteo forecast nudges customers to swap before the first snow.

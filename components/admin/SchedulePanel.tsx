@@ -205,6 +205,9 @@ function JobCard({ job, state, supplierName, refresh }: { job: Job; state: Admin
             {job.location.label || "Location"}
           </a>
         </p>
+        {job.onRims === false && (
+          <p className="font-medium text-amber-800 bg-amber-50 rounded-lg px-2 py-1">🛠 Tires not on rims — bring the tire machine &amp; balancer</p>
+        )}
         {job.vehicle && <p>🚗 {job.vehicle}</p>}
         {job.tire && (
           <p>

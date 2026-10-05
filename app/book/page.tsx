@@ -9,6 +9,7 @@ interface Info {
   phone: string;
   services: Record<string, { label: string; fee: number }>;
   advice: Advice;
+  brands: string[];
 }
 
 export default function BookPage() {
@@ -37,7 +38,7 @@ export default function BookPage() {
         {info?.advice?.text && (
           <div className="mb-4 bg-sky-50 border border-sky-200 text-sky-900 text-sm rounded-xl px-4 py-3">❄️ {info.advice.text}</div>
         )}
-        {info ? <BookingFlow services={info.services} /> : !error && <p className="text-gray-500 text-sm">Loading…</p>}
+        {info ? <BookingFlow services={info.services} brands={info.brands} /> : !error && <p className="text-gray-500 text-sm">Loading…</p>}
       </main>
     </div>
   );

@@ -21,6 +21,7 @@ import {
 interface Props {
   admin?: boolean;
   services: Record<string, { label: string; fee: number }>;
+  brands?: string[]; // brands currently in stock, for the picker
   onBooked?: (job: Job) => void;
 }
 
@@ -33,12 +34,15 @@ const SERVICE_HINT: Record<string, string> = {
 
 type Step = "need" | "results" | "details" | "done";
 
-export default function BookingFlow({ admin = false, services, onBooked }: Props) {
+export default function BookingFlow({ admin = false, services, brands = [], onBooked }: Props) {
   const [step, setStep] = useState<Step>("need");
   const [service, setService] = useState<ServiceKey>("new_tires");
   const [size, setSize] = useState("");
   const [qty, setQty] = useState(4);
   const [season, setSeason] = useState<Season>("any");
+  const [brand, setBrand] = useState("");
+  const [brandText, setBrandText] = useState("");
+  const [sourceBrand, setSourceBrand] = useState(false); // customer wants a brand nobody has in stock
   const [location, setLocation] = useState<GeoPoint | null>(null);
 
   const [result, setResult] = useState<SearchResult | null>(null);
@@ -60,17 +64,20 @@ export default function BookingFlow({ admin = false, services, onBooked }: Props
 
   const needsTires = service === "new_tires";
 
-  const search = async () => {
+  const search = async (brandOverride?: string) => {
+    const wantBrand = brandOverride ?? brand;
     setError("");
     if (!location) return setError("Please share your location or pick an address.");
     if (needsTires && !size.trim()) return setError("Enter your tire size (on the tire sidewall, e.g. 225/65R17).");
     setBusy(true);
     try {
       const r = await api<SearchResult>(admin ? "/api/admin/search" : "/api/public/search", {
-        body: { service, size, qty, season, location },
+        body: { service, size, qty, season, location, brand: wantBrand },
         admin,
       });
       setResult(r);
+      setBrand(r.brandMissing ? wantBrand : r.brand);
+      setSourceBrand(false);
       setOption(r.options[0] || null);
       setSuggestions(r.suggestions);
       setDays(r.days);
@@ -115,7 +122,10 @@ export default function BookingFlow({ admin = false, services, onBooked }: Props
           slot: pick.slot,
           customer: { name, phone, email },
           vehicle,
-          notes: needsTires && !option ? `[Needs tires sourced: ${qty}× ${result?.size || size}] ${notes}` : notes,
+          notes:
+            needsTires && !option
+              ? `[Needs tires sourced: ${qty}× ${brand ? `${brand} ` : ""}${result?.size || size}] ${notes}`
+              : notes,
         },
         admin,
       });
@@ -210,6 +220,28 @@ export default function BookingFlow({ admin = false, services, onBooked }: Props
                   </div>
                 </div>
               </div>
+              <div className="mt-3">
+                <p className="text-xs font-medium text-gray-600 mb-1">Brand (optional)</p>
+                <div className="flex flex-wrap gap-1">
+                  <Chip active={!brand} onClick={() => { setBrand(""); setBrandText(""); }}>
+                    Any brand
+                  </Chip>
+                  {brands.map((b) => (
+                    <Chip key={b} active={brand.toLowerCase() === b.toLowerCase()} onClick={() => { setBrand(b); setBrandText(""); }}>
+                      {b}
+                    </Chip>
+                  ))}
+                </div>
+                <input
+                  value={brandText}
+                  onChange={(e) => {
+                    setBrandText(e.target.value);
+                    setBrand(e.target.value.trim());
+                  }}
+                  placeholder="…or type a brand, e.g. Goodyear"
+                  className="mt-2 w-full border border-gray-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
             </Card>
           )}
 
@@ -219,7 +251,7 @@ export default function BookingFlow({ admin = false, services, onBooked }: Props
 
           <button
             type="button"
-            onClick={search}
+            onClick={() => search()}
             disabled={busy}
             className="w-full bg-brand-600 text-white rounded-xl py-3.5 font-semibold hover:bg-brand-700 disabled:opacity-50 transition"
           >
@@ -240,9 +272,44 @@ export default function BookingFlow({ admin = false, services, onBooked }: Props
 
           {needsTires && (
             <Card title={`Tires in stock for ${result.size} (${qty})`}>
+              {result.brands.length > 1 && (
+                <div className="flex gap-1.5 overflow-x-auto pb-2 -mx-1 px-1 mb-1 scrollbar-thin">
+                  <Chip active={!brand || result.brandMissing} onClick={() => search("")}>
+                    <span className="whitespace-nowrap">All brands</span>
+                  </Chip>
+                  {result.brands.map((b) => (
+                    <Chip key={b.brand} active={!result.brandMissing && brand === b.brand} onClick={() => search(b.brand)}>
+                      <span className="whitespace-nowrap">
+                        {b.brand} <span className="opacity-70">from {money(b.fromTotal)}</span>
+                      </span>
+                    </Chip>
+                  ))}
+                </div>
+              )}
+              {result.brandMissing && result.options.length > 0 && (
+                <div className="mb-3 bg-amber-50 border border-amber-200 text-amber-900 text-sm rounded-xl px-3 py-2.5 space-y-2">
+                  <p>
+                    No <b>{brand}</b> in {result.size} is in stock nearby right now. Here&apos;s what is available — or I can order {brand} for you.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOption(null);
+                      setSourceBrand(true);
+                    }}
+                    className={`text-sm font-semibold rounded-lg px-3 py-1.5 border ${
+                      sourceBrand ? "bg-amber-600 text-white border-amber-600" : "bg-white border-amber-300 text-amber-800"
+                    }`}
+                  >
+                    {sourceBrand ? `✓ I'll source ${brand} and call you with a price` : `I only want ${brand} — order it for me`}
+                  </button>
+                </div>
+              )}
               {result.options.length === 0 ? (
                 <div className="text-sm text-gray-600 space-y-1">
-                  <p>No supplier has {qty} of this size in stock right now.</p>
+                  <p>
+                    No supplier has {qty} {brand && result.brandMissing ? `${brand} tires` : "tires"} of this size in stock right now.
+                  </p>
                   <p>You can still book a time — I&apos;ll source the tires and call you with a price.</p>
                 </div>
               ) : (
@@ -251,9 +318,12 @@ export default function BookingFlow({ admin = false, services, onBooked }: Props
                     <button
                       key={o.key}
                       type="button"
-                      onClick={() => chooseOption(o)}
+                      onClick={() => {
+                        setSourceBrand(false);
+                        chooseOption(o);
+                      }}
                       className={`w-full text-left rounded-xl border-2 p-3 transition ${
-                        option?.key === o.key ? "border-brand-600 bg-brand-50" : "border-gray-200 hover:border-brand-300"
+                        !sourceBrand && option?.key === o.key ? "border-brand-600 bg-brand-50" : "border-gray-200 hover:border-brand-300"
                       }`}
                     >
                       <div className="flex items-start gap-3">
@@ -385,7 +455,9 @@ export default function BookingFlow({ admin = false, services, onBooked }: Props
             <dl className="text-sm space-y-1">
               <Row k="Service" v={services[service]?.label} />
               {needsTires && option && <Row k="Tires" v={`${qty}× ${option.brand} ${option.model} ${option.size}`} />}
-              {needsTires && !option && <Row k="Tires" v={`${qty}× ${result?.size} — I'll source & quote`} />}
+              {needsTires && !option && (
+                <Row k="Tires" v={`${qty}× ${brand ? `${brand} ` : ""}${result?.size} — I'll source & quote`} />
+              )}
               <Row k="When" v={`${pick.label}, ${formatSlot(pick.slot)}`} />
               <Row k="Where" v={location?.label || ""} />
               <Row k="Total" v={`${money(total)}${needsTires && !option ? " + tires" : ""} + tax`} bold />

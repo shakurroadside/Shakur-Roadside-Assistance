@@ -84,6 +84,7 @@ export default function JobsPage() {
           <BookingFlow
             admin
             services={state.settings.services}
+            brands={Array.from(new Set(state.inventory.filter((i) => i.qty > 0).map((i) => i.brand))).sort()}
             onBooked={() => {
               refresh();
             }}

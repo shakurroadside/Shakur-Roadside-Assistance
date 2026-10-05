@@ -4,7 +4,7 @@ One app for chats, jobs, and tire stock.
 
 | Page | Who | What |
 |------|-----|------|
-| `/book` | Customers | Enter tire size + location → see in-stock tires with installed prices → pick a suggested day (days I'm already working nearby come first) → book. |
+| `/book` | Customers | Enter tire size (and optionally a brand, e.g. Goodyear or Michelin) + location → see in-stock tires with installed prices → pick a suggested day (days I'm already working nearby come first) → book. |
 | `/jobs` | You | Schedule by day with route + supplier pickups (opens in Google Maps), confirm/text customers, move jobs to better days, create jobs while on the phone, upload supplier stock (CSV), settings. |
 | `/` | You | Live chat. Every new booking also opens a chat thread. |
 

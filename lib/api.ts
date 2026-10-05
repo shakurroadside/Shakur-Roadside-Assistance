@@ -66,6 +66,9 @@ export interface SearchResult {
   qty: number;
   service: ServiceKey;
   options: TireOption[];
+  brand: string;
+  brandMissing: boolean;
+  brands: { brand: string; count: number; fromTotal: number }[];
   suggestions: SlotSuggestion[];
   days: BookableDay[];
   advice: Advice;

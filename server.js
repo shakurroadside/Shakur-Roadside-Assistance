@@ -2,6 +2,7 @@ const { createServer } = require("http");
 const { parse } = require("url");
 const next = require("next");
 const { WebSocketServer } = require("ws");
+const { createApi } = require("./lib/server/api");
 
 const dev = process.env.NODE_ENV !== "production";
 const app = next({ dev });
@@ -20,9 +21,51 @@ function broadcast(data) {
   }
 }
 
+// Each new booking opens a chat thread so the job shows up in Chat Control too.
+function openBookingConversation(job) {
+  const tire = job.tire
+    ? `${job.tire.qty}× ${job.tire.brand} ${job.tire.model} ${job.tire.size} (${job.tire.season})`
+    : "No tires to supply";
+  const conv = {
+    id: `conv_${Date.now()}`,
+    customer: { name: job.customer.name, phone: job.customer.phone },
+    status: "open",
+    createdAt: new Date().toISOString(),
+    messages: [
+      {
+        id: `msg_${Date.now()}_book`,
+        conversationId: `conv_${Date.now()}`,
+        sender: "customer",
+        senderName: job.customer.name,
+        text:
+          `📅 New ${job.source === "customer" ? "online booking" : "job"}: ${job.serviceLabel}\n` +
+          `${job.date} · ${job.slot}\n` +
+          `📍 ${job.location.label || `${job.location.lat.toFixed(4)}, ${job.location.lng.toFixed(4)}`}\n` +
+          `🛞 ${tire}\n` +
+          `💲 Total quoted: $${job.total}` +
+          (job.vehicle ? `\n🚗 ${job.vehicle}` : "") +
+          (job.notes ? `\n📝 ${job.notes}` : ""),
+        timestamp: new Date().toISOString(),
+      },
+    ],
+  };
+  conv.messages[0].conversationId = conv.id;
+  conversations.set(conv.id, conv);
+  broadcast({ type: "CONVERSATION_ADDED", conversation: conv });
+}
+
+const api = createApi({
+  onJobsChanged: () => broadcast({ type: "JOBS_CHANGED" }),
+  onNewBooking: openBookingConversation,
+});
+
 app.prepare().then(() => {
   const server = createServer((req, res) => {
     const parsedUrl = parse(req.url, true);
+    if (parsedUrl.pathname && parsedUrl.pathname.startsWith("/api/")) {
+      api(req, res, parsedUrl.pathname, parsedUrl.query);
+      return;
+    }
     handle(req, res, parsedUrl);
   });
 

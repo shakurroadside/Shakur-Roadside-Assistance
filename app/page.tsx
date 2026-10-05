@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useChat, Conversation } from "@/lib/useChat";
 import ConversationList from "@/components/ConversationList";
 import ChatWindow from "@/components/ChatWindow";
@@ -38,7 +39,7 @@ export default function Home() {
           </button>
         )}
         <div className="flex-1 flex items-center gap-2">
-          <span className="text-xl font-bold tracking-tight">🚗 Shakur Roadside</span>
+          <span className="text-xl font-bold tracking-tight whitespace-nowrap">🚗 <span className="hidden sm:inline">Shakur </span>Roadside</span>
           <span className="hidden sm:inline text-brand-100 text-sm">Chat Control</span>
         </div>
         <div className="flex items-center gap-2">
@@ -47,9 +48,15 @@ export default function Home() {
             title={connected ? "Connected" : "Reconnecting…"}
           />
           <span className="text-xs text-brand-100">{connected ? "Live" : "Reconnecting…"}</span>
+          <Link
+            href="/jobs"
+            className="ml-1 whitespace-nowrap border border-white/60 text-white font-semibold text-sm px-3 py-1.5 rounded-full hover:bg-brand-700 transition"
+          >
+            📅 Jobs
+          </Link>
           <button
             onClick={() => setShowNew(true)}
-            className="ml-2 bg-white text-brand-600 font-semibold text-sm px-3 py-1.5 rounded-full hover:bg-brand-50 transition"
+            className="ml-1 whitespace-nowrap bg-white text-brand-600 font-semibold text-sm px-3 py-1.5 rounded-full hover:bg-brand-50 transition"
           >
             + New
           </button>
